@@ -1,0 +1,278 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess The Song</title>
+    <style>
+        body, * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        #timeline-container {
+            width: 300px;
+            height: 10px;
+            background: #ddd;
+            position: relative;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #timeline {
+            width: 0%;
+            height: 100%;
+            border: 1px solid #EEE;
+        }
+
+        .search-container {
+            position: relative;
+            width: 300px;
+            margin: 50px auto;
+        }
+        .search-box {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #EEE;
+            border-radius: 5px;
+            outline: none;
+            background: #1E1E1E;
+        }
+        .dropdown-list {
+            position: absolute;
+            width: 100%;
+            border: 1px solid #ccc;
+            display: none;
+            max-height: 200px;
+            overflow-y: auto;
+            border-radius: 5px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .dropdown-list div {
+            padding: 10px;
+            cursor: pointer;
+        }
+        .dropdown-list div:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Guess The Song</h1>
+    <h6>by Lorenzo Cappellini</h6>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-box" placeholder="Search...">
+        <div id="dropdownList" class="dropdown-list"></div>
+        <button onclick="submit_guess">Submit</button>
+    </div>
+
+    <audio id="player" src="Hi-tech%20magic.mp3"></audio>
+    <button onclick="playAndStop()">Play/Pause</button>
+
+    <div id="timeline-container">
+        <div id="timeline"></div>
+    </div>
+    <span id="currentTime">0:00</span>
+
+    <button onclick="skip_guess()">Skip Guess</button>
+    <button onclick="skip_song()">Skip Song</button>
+
+    <script>
+
+        var guess_steps =  [100, 200, 300];
+        var guess_index = 0;
+
+        document.addEventListener("keydown", function(event) {
+            if (event.code === "MediaPlayPause") {
+                event.preventDefault();
+                //togglePlay();
+            }
+        });
+
+
+        const audio = document.getElementById("player");
+        const timeline = document.getElementById("timeline");
+        const currentTimeDisplay = document.getElementById("currentTime");
+
+        function togglePlay() {
+            if (audio.paused) {
+                audio.play();
+            } else {
+                audio.pause();
+            }
+        }
+
+        function playAndStop() {
+            let audio = document.getElementById("player");
+            if (audio.paused) {
+                audio.play();
+
+                setTimeout(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    }, guess_steps[guess_index]);
+            } else {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+
+        }
+
+        audio.ontimeupdate = () => {
+            timeline.style.width = (audio.currentTime / 16) * 100 + "%";
+            currentTimeDisplay.textContent = formatTime(audio.currentTime);
+        };
+
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        const input = document.getElementById("searchInput");
+        const dropdown = document.getElementById("dropdownList");
+
+        input.addEventListener("input", function () {
+            const value = this.value.toLowerCase();
+
+            var url = "https://ws.audioscrobbler.com/2.0/?method=track.search&track="+value+"&limit=6&api_key=cc3138d654109532637ab34b80d95580&format=json";
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    try {
+                        var tracks = data.results.trackmatches.track;
+                    } catch (error) {
+                        console.log(error);
+                        return;
+                    }
+
+                    dropdown.innerHTML = "";
+
+                    tracks.forEach(item => {
+                            const text = item.artist + " - " + item.name;
+                            console.log(text);
+                            const div = document.createElement("div");
+                            div.textContent = text;
+                            div.addEventListener("click", function () {
+                                input.value = text;
+                                dropdown.style.display = "none";
+                            });
+                            dropdown.appendChild(div);
+                        });
+                    dropdown.style.display = tracks.length ? "block" : "none";
+
+                })
+                .catch(error => {
+                    console.error("Error fetching data:", error);
+                });
+        });
+
+        function generateRandomString(size) {
+            const characters = 'abcdefghijklmnopqrstuvwxyz';
+            let result = '';
+            for (let i = 0; i < size; i++) {
+                result += characters[Math.floor(Math.random() * characters.length)];
+            }
+            return result;
+        }
+
+        async function pick_random_song(){
+            var query = generateRandomString(2);
+            var size = 50;
+            var url = "https://ws.audioscrobbler.com/2.0/?method=track.search&track="+query+"&limit="+size+"&api_key=cc3138d654109532637ab34b80d95580&format=json";
+            var index = Math.floor(Math.random() * size);
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            var data = await response.json();
+
+            try {
+                var tracks = data.results.trackmatches.track;
+            } catch (error) {
+                console.log(error);
+                return;
+            }
+
+            if (index >= tracks.length) {
+                index = Math.floor(Math.random() * tracks.length);
+            }
+
+            return tracks[index];
+        }
+
+        function skip_guess(){
+            guess_index++;
+            if (guess_index === guess_steps.length) {
+                skip_song();
+                guess_index = 0;
+            }
+        }
+
+        async function retrieve_yt_link(url){
+            const headers = {
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "accept-encoding": "gzip, deflate, br, zstd",
+                "accept-language": "en,it-IT;q=0.9,it;q=0.8,en-US;q=0.7",
+                "cache-control": "no-cache",
+                "pragma": "no-cache",
+                //"sec-ch-ua": "Opera GX";v="116", "Chromium";v="131", "Not_A Brand";v="24"
+                "sec-ch-ua-platform": "Windows",
+                "sec-fetch-dest": "document",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-site": "none",
+                "sec-fetch-user": "?1",
+                "upgrade-insecure-requests": "1",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/116.0.0.0"
+            };
+            var response = await fetch(url);//, {mode: "no-cors", headers: headers});
+            console.log(response);
+            const htmlText = await response.text();
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlText, 'text/html');
+
+            var res = doc.getElementsByClassName("header-new-playlink");
+            if (res.length > 0){
+                return res[0].href;
+            }
+            return null;
+        }
+
+        async function skip_song(){
+            var song = await pick_random_song();
+            console.log(song);
+            var fullname = song.artist + " - " + song.name;
+            console.log(song.artist + " - " + song.name);
+            console.log(song.url);
+
+            var yt_link = retrieve_yt_link(song.url);
+            console.log(yt_link);
+
+
+        }
+
+        function submit_guess(){
+            guess_index++;
+            var correct = false;
+            if (guess_index === guess_steps.length){
+                skip_song();
+                guess_index = 0;
+            }
+        }
+
+    </script>
+
+</body>
+</html>
